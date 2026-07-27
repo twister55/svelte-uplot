@@ -40,15 +40,14 @@
 		<button onclick={() => (showBands = !showBands)}>Toggle fill (recreate)</button>
 	</p>
 
-	<h2>Component</h2>
+	<h2>Two charts, shared cursor (<code>syncKey</code>)</h2>
 
 	<div class="chart">
-		<UPlot {options} {data} />
+		<UPlot {options} {data} syncKey="demo" />
 	</div>
 
-	<h2>The same thing as an attachment</h2>
-
-	<div class="chart" {@attach uplot(() => ({ options, data }))}></div>
+	<!-- the same thing without the component -->
+	<div class="chart" {@attach uplot(() => ({ options, data, syncKey: 'demo' }))}></div>
 </main>
 
 <style>

@@ -12,11 +12,24 @@
 		data: uPlot.AlignedData;
 		/** false preserves zoom/pan across data updates (uPlot default: true) */
 		resetScales?: boolean;
+		/** share cursor with other charts using the same key */
+		syncKey?: string;
 		onCreate?: (chart: uPlot) => void;
 		onDestroy?: (chart: uPlot) => void;
 	}
 
-	let { options, data, resetScales = true, onCreate, onDestroy, ...rest }: Props = $props();
+	let {
+		options,
+		data,
+		resetScales = true,
+		syncKey,
+		onCreate,
+		onDestroy,
+		...rest
+	}: Props = $props();
 </script>
 
-<div {...rest} {@attach uplot(() => ({ options, data, resetScales, onCreate, onDestroy }))}></div>
+<div
+	{...rest}
+	{@attach uplot(() => ({ options, data, resetScales, syncKey, onCreate, onDestroy }))}
+></div>
