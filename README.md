@@ -130,6 +130,13 @@ The config object accepts the same fields as the component props
 (`options`, `data`, `resetScales`, `autosize`, `syncKey`, `onCreate`,
 `onDestroy`).
 
+## SSR / SvelteKit
+
+uPlot is browser-only (canvas, ResizeObserver), but importing it is SSR-safe.
+The component server-renders to its bare container `<div>`; the chart is created
+strictly inside effects and attachments, which never run on the server. No
+`browser` checks or dynamic imports needed in your code.
+
 ## Scope
 
 svelte-uplot binds uPlot's lifecycle to Svelte's reactivity — nothing more. The
@@ -149,7 +156,7 @@ implementation details of the lifecycle, not exported utilities.
 
 ```sh
 pnpm dev        # demo site
-pnpm test:unit  # vitest browser mode (Chromium)
+pnpm test:unit  # vitest browser mode (Chromium) + node SSR tests
 pnpm build      # svelte-package + publint
 ```
 
