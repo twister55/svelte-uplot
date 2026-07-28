@@ -42,12 +42,13 @@
 
 	<h2>Two charts, shared cursor (<code>syncKey</code>)</h2>
 
-	<div class="chart">
-		<UPlot {options} {data} syncKey="demo" />
-	</div>
+	<!-- the height goes on the chart's own element: that is what autosize measures -->
+	<UPlot class="chart" {options} {data} syncKey="demo" />
 
 	<!-- the same thing without the component -->
 	<div class="chart" {@attach uplot(() => ({ options, data, syncKey: 'demo' }))}></div>
+
+	<p><small>Resize the window: both charts follow their container.</small></p>
 </main>
 
 <style>
@@ -57,7 +58,10 @@
 		font-family: system-ui, sans-serif;
 	}
 
-	.chart {
+	/* :global, because a scoped class never reaches a child component's element —
+	   `.chart` would compile to `.chart.svelte-xxx` and match only the <div> below */
+	:global(.chart) {
+		height: 280px;
 		margin-bottom: 1rem;
 	}
 </style>

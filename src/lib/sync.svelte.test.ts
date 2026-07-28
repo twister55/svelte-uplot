@@ -9,6 +9,8 @@ function renderChart(props: Record<string, unknown>, charts: uPlot[]) {
 	return render(UPlot, {
 		options: options(),
 		data: DATA,
+		// fixed size: these tests are about the cursor, not about layout
+		autosize: false,
 		onCreate: (u: uPlot) => charts.push(u),
 		...props
 	});

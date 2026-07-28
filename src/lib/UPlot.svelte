@@ -12,6 +12,8 @@
 		data: uPlot.AlignedData;
 		/** false preserves zoom/pan across data updates (uPlot default: true) */
 		resetScales?: boolean;
+		/** follow the container size (default true) */
+		autosize?: boolean;
 		/** share cursor with other charts using the same key */
 		syncKey?: string;
 		onCreate?: (chart: uPlot) => void;
@@ -22,6 +24,7 @@
 		options,
 		data,
 		resetScales = true,
+		autosize = true,
 		syncKey,
 		onCreate,
 		onDestroy,
@@ -31,5 +34,5 @@
 
 <div
 	{...rest}
-	{@attach uplot(() => ({ options, data, resetScales, syncKey, onCreate, onDestroy }))}
+	{@attach uplot(() => ({ options, data, resetScales, autosize, syncKey, onCreate, onDestroy }))}
 ></div>

@@ -1,6 +1,7 @@
 import uPlot from 'uplot';
 import { untrack } from 'svelte';
 import type { Attachment } from 'svelte/attachments';
+import { autosize, contentBox } from './autosize.js';
 
 export interface UPlotConfig {
 	/**
@@ -15,6 +16,11 @@ export interface UPlotConfig {
 	 * re-fits the x scale to the new data; pass false to preserve zoom/pan.
 	 */
 	resetScales?: boolean;
+	/**
+	 * Follow the container size with a ResizeObserver (default true). When on,
+	 * options.width/height are only used as a fallback for a zero-sized container.
+	 */
+	autosize?: boolean;
 	/** Share cursor with other charts using the same key (uPlot.sync). */
 	syncKey?: string;
 	onCreate?: (chart: uPlot) => void;
@@ -29,14 +35,15 @@ export interface UPlotConfig {
  * ```
  *
  * Decides between recreating the chart and updating it in place: a change of
- * `options` (by reference) or `syncKey` recreates, a change of `data` alone is
- * a setData() call.
+ * `options` (by reference), `syncKey` or `autosize` recreates, a change of
+ * `data` alone is a setData() call.
  */
 export function uplot(config: () => UPlotConfig): Attachment<HTMLElement> {
 	return (target) => {
 		let chart: uPlot | undefined;
 		let usedOptions: uPlot.Options | undefined;
 		let usedSyncKey: string | undefined;
+		let usedAutosize: boolean | undefined;
 		// captured at creation, so a recreate hands the outgoing chart to the
 		// callback that owned it and not to whatever the new props carry
 		let usedOnDestroy: UPlotConfig['onDestroy'];
@@ -54,6 +61,21 @@ export function uplot(config: () => UPlotConfig): Attachment<HTMLElement> {
 
 		function create(cfg: UPlotConfig) {
 			let opts = cfg.options;
+
+			if (cfg.autosize ?? true) {
+				// the container is measured now and followed from here on; the caller's
+				// width/height stay the fallback for a container that measures 0. The
+				// legend cannot be measured before the chart exists, so leaving room for
+				// it is the plugin's first observation, a frame later.
+				const box = contentBox(target);
+
+				opts = {
+					...opts,
+					plugins: [...(opts.plugins ?? []), autosize(target)],
+					width: box.width || opts.width,
+					height: box.height || opts.height
+				};
+			}
 
 			if (cfg.syncKey) {
 				opts = {
@@ -77,7 +99,14 @@ export function uplot(config: () => UPlotConfig): Attachment<HTMLElement> {
 			const cfg = config();
 
 			untrack(() => {
-				if (!chart || cfg.options !== usedOptions || cfg.syncKey !== usedSyncKey) {
+				const fit = cfg.autosize ?? true;
+
+				if (
+					!chart ||
+					cfg.options !== usedOptions ||
+					cfg.syncKey !== usedSyncKey ||
+					fit !== usedAutosize
+				) {
 					destroy();
 					create(cfg);
 				} else if (chart.data !== cfg.data) {
@@ -86,6 +115,7 @@ export function uplot(config: () => UPlotConfig): Attachment<HTMLElement> {
 
 				usedOptions = cfg.options;
 				usedSyncKey = cfg.syncKey;
+				usedAutosize = fit;
 			});
 		});
 

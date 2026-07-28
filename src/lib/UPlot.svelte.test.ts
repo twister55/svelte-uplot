@@ -10,6 +10,7 @@ describe('UPlot.svelte', () => {
 		const { container } = render(UPlot, {
 			options: options(),
 			data: DATA,
+			autosize: false,
 			onCreate: (u) => charts.push(u)
 		});
 
@@ -23,6 +24,7 @@ describe('UPlot.svelte', () => {
 		const { rerender } = render(UPlot, {
 			options: options(),
 			data: DATA,
+			autosize: false,
 			onCreate: (u) => charts.push(u)
 		});
 
@@ -42,6 +44,7 @@ describe('UPlot.svelte', () => {
 		const { rerender } = render(UPlot, {
 			options: options(),
 			data: DATA,
+			autosize: false,
 			onCreate: (u) => charts.push(u)
 		});
 
@@ -62,6 +65,7 @@ describe('UPlot.svelte', () => {
 		const { rerender } = render(UPlot, {
 			options: options(),
 			data: DATA,
+			autosize: false,
 			resetScales: false,
 			onCreate: (u) => charts.push(u)
 		});
@@ -84,6 +88,7 @@ describe('UPlot.svelte', () => {
 		const { rerender } = render(UPlot, {
 			options: options(),
 			data: DATA,
+			autosize: false,
 			onCreate: (u) => charts.push(u),
 			onDestroy: (u) => destroyed.push(u)
 		});
@@ -102,6 +107,7 @@ describe('UPlot.svelte', () => {
 		const { rerender } = render(UPlot, {
 			options: options(),
 			data: DATA,
+			autosize: false,
 			onCreate: (u) => charts.push(u),
 			onDestroy: (u) => beforeRerender.push(u)
 		});
@@ -122,6 +128,7 @@ describe('UPlot.svelte', () => {
 		const { rerender } = render(UPlot, {
 			options: opts,
 			data: DATA,
+			autosize: false,
 			onCreate: (u) => charts.push(u)
 		});
 
@@ -138,6 +145,7 @@ describe('UPlot.svelte', () => {
 		const { container, unmount } = render(UPlot, {
 			options: options(),
 			data: DATA,
+			autosize: false,
 			onCreate: (u) => charts.push(u),
 			onDestroy: (u) => destroyed.push(u)
 		});
@@ -152,6 +160,7 @@ describe('UPlot.svelte', () => {
 		const { container } = render(UPlot, {
 			options: options(),
 			data: DATA,
+			autosize: false,
 			class: 'chart',
 			'data-testid': 'plot'
 		});
