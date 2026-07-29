@@ -1,0 +1,104 @@
+# Публикация в npm — ТОЛЬКО вручную, кнопкой Run workflow.
+# Никаких триггеров по push, тегам или GitHub-релизам: публикация требует
+# внешнего разрешения (1win), поэтому автопаблиш здесь недопустим.
+#
+# Перед первым настоящим запуском (dry_run = false) нужно:
+#   1. добавить секрет NPM_TOKEN в Settings → Secrets and variables → Actions
+#      (automation-токен с правом publish);
+#   2. убедиться, что разрешение на публикацию получено.
+#
+# Каждый релиз начинается с бампа version в package.json и записи в CHANGELOG.md:
+# версии на npm неизменяемы, повторно опубликовать номер нельзя. Шаг
+# «Verify version is not published yet» проверяет это до сборки — в том числе
+# в dry-run, где сам `npm publish --dry-run` реестр не опрашивает.
+#
+# Кнопка Run workflow появляется только когда этот файл есть в ветке main.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Прогон без публикации: собрать пакет и показать содержимое тарбола'
+        type: boolean
+        default: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      # id-token нужен npm для генерации provenance.
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Версия pnpm задана явно — см. комментарий в ci.yml.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: pnpm install --frozen-lockfile
+
+      # Стоит до сборки и тестов, чтобы занятый номер версии отваливался за
+      # секунды, а не после нескольких минут работы.
+      - name: Verify version is not published yet
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          echo "Готовим к публикации $name@$version"
+
+          set +e
+          output=$(npm view "$name@$version" version 2>&1)
+          status=$?
+          set -e
+
+          if [ $status -eq 0 ]; then
+            echo "::error::$name@$version уже опубликован — подними version в package.json"
+            exit 1
+          fi
+          if ! echo "$output" | grep -q "E404"; then
+            echo "::error::Не удалось проверить версию в реестре"
+            echo "$output"
+            exit 1
+          fi
+          echo "Версия $version свободна"
+
+      # Тот же набор проверок, что и в ci.yml: workflow_dispatch запускается с
+      # любой ветки, поэтому полагаться на зелёный CI в main нельзя.
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm check
+
+      # Проект `client` в vite.config.ts гоняет тесты в Chromium.
+      - name: Install Chromium for vitest browser mode
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Unit tests
+        run: pnpm test:unit -- --run
+
+      - name: Build package
+        run: pnpm build
+
+      # provenance в dry-run не проверяется — аттестация создаётся только при
+      # реальной загрузке, поэтому флаг стоит лишь на боевом шаге.
+      - name: Publish (dry run)
+        if: inputs.dry_run
+        run: npm publish --dry-run --access public
+
+      - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

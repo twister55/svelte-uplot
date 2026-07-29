@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Позволяет прогнать CI руками на любой ветке из вкладки Actions.
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # В package.json нет поля packageManager, поэтому версия pnpm задана явно.
+      # Когда поле появится (задача 13), input version можно убрать —
+      # pnpm/action-setup прочитает версию из package.json сам.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm check
+
+      # Всё, что ниже, — до unit-тестов: проект `client` в vite.config.ts
+      # гоняет тесты в Chromium через vitest browser mode.
+      - name: Resolve Playwright version
+        id: playwright
+        run: |
+          version=$(node -p "require('@playwright/test/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      # Сами бинарники браузера кэшируются, системные библиотеки — нет,
+      # поэтому при попадании в кэш всё равно нужен install-deps.
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Chromium system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      - name: Unit tests
+        run: pnpm test:unit -- --run
+
+      # Шага `pnpm test:e2e` здесь пока нет: в репозитории нет ни одного файла
+      # *.e2e.ts, и playwright test падает с «No tests found». Вернуть шаг вместе
+      # с первыми реальными e2e-тестами (задача 16, 16-test-coverage.md) —
+      # скрипт сам ставит chromium и поднимает preview-сервер на порту 4173.
+
+      # vite build + svelte-package + publint.
+      - name: Build package
+        run: pnpm build
