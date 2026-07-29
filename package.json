@@ -1,6 +1,6 @@
 {
 	"name": "svelte-uplot",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"description": "Thin uPlot wrapper for Svelte 5: declarative component + attachment, recreate-vs-setData semantics, autosize, cursor sync",
 	"license": "MIT",
 	"repository": {
