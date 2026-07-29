@@ -1,18 +1,18 @@
-# Публикация в npm — ТОЛЬКО вручную, кнопкой Run workflow.
-# Никаких триггеров по push, тегам или GitHub-релизам: публикация требует
-# внешнего разрешения (1win), поэтому автопаблиш здесь недопустим.
+# Publishing to npm is manual ONLY, through the Run workflow button.
+# No push, tag or release triggers: publishing needs external sign-off, so
+# nothing here may publish on its own.
 #
-# Перед первым настоящим запуском (dry_run = false) нужно:
-#   1. добавить секрет NPM_TOKEN в Settings → Secrets and variables → Actions
-#      (automation-токен с правом publish);
-#   2. убедиться, что разрешение на публикацию получено.
+# Before the first real run (dry_run = false):
+#   1. add an NPM_TOKEN secret under Settings → Secrets and variables → Actions
+#      (an automation token with publish rights);
+#   2. make sure permission to publish has been given.
 #
-# Каждый релиз начинается с бампа version в package.json и записи в CHANGELOG.md:
-# версии на npm неизменяемы, повторно опубликовать номер нельзя. Шаг
-# «Verify version is not published yet» проверяет это до сборки — в том числе
-# в dry-run, где сам `npm publish --dry-run` реестр не опрашивает.
+# Every release starts with a version bump in package.json and an entry in
+# CHANGELOG.md: npm versions are immutable, a number cannot be published twice.
+# The "Verify version is not published yet" step checks that before the build —
+# including on a dry run, where `npm publish --dry-run` never asks the registry.
 #
-# Кнопка Run workflow появляется только когда этот файл есть в ветке main.
+# The Run workflow button only appears once this file is on the main branch.
 
 name: Release
 
@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Прогон без публикации: собрать пакет и показать содержимое тарбола'
+        description: 'Rehearse without publishing: build the package and print the tarball contents'
         type: boolean
         default: true
 
@@ -29,14 +29,14 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      # id-token нужен npm для генерации provenance.
+      # npm needs id-token to generate provenance.
       id-token: write
       contents: read
 
     steps:
       - uses: actions/checkout@v4
 
-      # Версия pnpm задана явно — см. комментарий в ci.yml.
+      # pnpm's version is pinned — see the comment in ci.yml.
       - uses: pnpm/action-setup@v4
         with:
           version: 10.11.0
@@ -49,13 +49,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Стоит до сборки и тестов, чтобы занятый номер версии отваливался за
-      # секунды, а не после нескольких минут работы.
+      # Ahead of the build and the tests, so that a taken version number fails in
+      # seconds instead of after several minutes of work.
       - name: Verify version is not published yet
         run: |
           name=$(node -p "require('./package.json').name")
           version=$(node -p "require('./package.json').version")
-          echo "Готовим к публикации $name@$version"
+          echo "Preparing to publish $name@$version"
 
           set +e
           output=$(npm view "$name@$version" version 2>&1)
@@ -63,25 +63,25 @@ jobs:
           set -e
 
           if [ $status -eq 0 ]; then
-            echo "::error::$name@$version уже опубликован — подними version в package.json"
+            echo "::error::$name@$version is already published — bump the version in package.json"
             exit 1
           fi
           if ! echo "$output" | grep -q "E404"; then
-            echo "::error::Не удалось проверить версию в реестре"
+            echo "::error::Could not check the version against the registry"
             echo "$output"
             exit 1
           fi
-          echo "Версия $version свободна"
+          echo "Version $version is free"
 
-      # Тот же набор проверок, что и в ci.yml: workflow_dispatch запускается с
-      # любой ветки, поэтому полагаться на зелёный CI в main нельзя.
+      # The same checks ci.yml runs: workflow_dispatch can be launched from any
+      # branch, so a green CI on main proves nothing about what is being published.
       - name: Lint
         run: pnpm lint
 
       - name: Typecheck
         run: pnpm check
 
-      # Проект `client` в vite.config.ts гоняет тесты в Chromium.
+      # The `client` project in vite.config.ts runs its tests in Chromium.
       - name: Install Chromium for vitest browser mode
         run: pnpm exec playwright install --with-deps chromium
 
@@ -91,8 +91,8 @@ jobs:
       - name: Build package
         run: pnpm build
 
-      # provenance в dry-run не проверяется — аттестация создаётся только при
-      # реальной загрузке, поэтому флаг стоит лишь на боевом шаге.
+      # A dry run never exercises provenance — the attestation is only created on a
+      # real upload — so the flag belongs on the publishing step alone.
       - name: Publish (dry run)
         if: inputs.dry_run
         run: npm publish --dry-run --access public
