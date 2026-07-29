@@ -13,6 +13,11 @@ function chartEl(container: HTMLElement) {
 	return container.querySelector<HTMLDivElement>('[data-testid="chart"]')!;
 }
 
+/** uPlot's own legend — the part of the overhead that rewraps with the width */
+function legendHeight(u: uPlot) {
+	return u.root.querySelector<HTMLElement>('.u-legend')!.offsetHeight;
+}
+
 function sleep(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -162,14 +167,23 @@ describe('autosize', () => {
 		await laidOut(charts[0]);
 		await expect.poll(() => charts[0].root.offsetHeight, { timeout: 2000 }).toBe(240);
 		const oneRow = charts[0].height;
+		const oneRowLegend = legendHeight(charts[0]);
 
 		chartEl(container).style.width = '200px';
 		await expect.poll(() => charts[0].width, { timeout: 2000 }).toBe(200);
 
-		// the legend now needs a row it did not need before, and the whole chart still
-		// has to fit the 240px it was given
-		await expect.poll(() => charts[0].root.offsetHeight, { timeout: 2000 }).toBe(240);
-		expect(charts[0].height).toBeLessThan(oneRow);
+		// The legend has rewrapped by now — the width is what it wraps to, and the
+		// convergence passes that follow only move the height. How many rows it takes
+		// at 200px is a font metric, and a platform whose glyphs are a little wider
+		// needs more of them, so what the plot owes the legend is measured, not assumed.
+		const grew = legendHeight(charts[0]) - oneRowLegend;
+		expect(grew).toBeGreaterThan(0);
+
+		// The plot gives up exactly that much, instead of keeping the height it was
+		// sized to before the rewrap. Clamped at zero: a legend taller than the box
+		// leaves the plotting area nothing, and the root then outgrows the element —
+		// the degenerate case the next test starts from.
+		await expect.poll(() => charts[0].height, { timeout: 2000 }).toBe(Math.max(0, oneRow - grew));
 	});
 
 	it('takes the plot height back once the legend can unwrap again', async () => {
