@@ -1,18 +1,48 @@
 # svelte-uplot
 
-A thin [uPlot](https://github.com/leeoniya/uPlot) wrapper for **Svelte 5** (runes).
-uPlot is chosen for speed — the wrapper's job is to add nothing on top: it only
-binds uPlot's lifecycle to Svelte's reactivity.
+### The fastest charts on the web, bound to Svelte 5's reactivity — and nothing else.
 
-- **Declarative component + attachment** — two equal ways to use it
-- **Correct update semantics** — the wrapper decides between recreating the chart
-  (uPlot cannot be reconfigured in place) and a cheap `setData()` call
-- **Autosize by default** — built-in ResizeObserver-based resizing
-- **Cursor sync** — share a cursor across charts with a single `syncKey` prop
+[uPlot](https://github.com/leeoniya/uPlot) draws an interactive 150,000-point chart
+from a cold start in ~90ms, in ~45 KB min.
+`svelte-uplot` is the ~3 KB layer that makes it feel like a Svelte component:
+declarative, reactive, autosizing, SSR-safe — with **zero** abstraction over uPlot's own API.
 
-Peer dependencies: `svelte >= 5.29` (attachments) and `uplot >= 1.6.25` — nothing
-else. uPlot plugins compose through the standard `options.plugins`; the wrapper
-doesn't need to know about them.
+[![npm](https://img.shields.io/npm/v/svelte-uplot?logo=npm&color=cb3837)](https://www.npmjs.com/package/svelte-uplot)
+[![gzip](https://img.shields.io/badge/runtime-3.1_kB_gzip-brightgreen)](#why-this-one)
+[![Svelte 5](https://img.shields.io/badge/Svelte-5%20runes-ff3e00?logo=svelte&logoColor=white)](https://svelte.dev)
+[![uPlot](https://img.shields.io/badge/uPlot-%E2%89%A5%201.6.25-4b8bbe)](https://github.com/leeoniya/uPlot)
+[![TypeScript](https://img.shields.io/badge/types-included-3178c6?logo=typescript&logoColor=white)](#typescript)
+[![SSR safe](https://img.shields.io/badge/SSR-safe-success)](#ssr--sveltekit)
+[![tests](https://img.shields.io/badge/tests-38%20passing-success)](#development)
+[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+
+[Install](#install) · [Quick start](#quick-start) · [Update semantics](#update-semantics) · [Props](#props) · [Autosize](#autosize) · [Cursor sync](#cursor-sync) · [Attachment](#attachment) · [Scope](#scope)
+
+---
+
+## Why this one
+
+Most chart wrappers spend their bundle re-inventing the library they wrap: per-option
+props, a config DSL, a plugin registry, a theme layer. Every one of those is a wall
+between you and uPlot the day you need something it didn't anticipate.
+
+This one has no walls. `options` goes to uPlot untouched.
+
+|                                  |                                                                                                                           |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 🪶 **~3 KB gzip**                | The whole runtime. No dependencies of its own — uPlot and Svelte are peers.                                               |
+| ⚡ **Zero overhead**             | No wrapping, no normalizing, no diffing your options. One `new uPlot()` and one `setData()`, exactly when they're needed. |
+| 🔁 **Correct by reference**      | New `options` → recreate (uPlot can't be reconfigured in place). New `data` → cheap `setData()`. No guessing.             |
+| 📐 **Autosize built in**         | A throttled `ResizeObserver` keeps the chart filling its container — splitters, sidebars, window resizes, all free.       |
+| 🔗 **Cursor sync**               | Share a crosshair across a whole dashboard with one `syncKey="…"` prop.                                                   |
+| 🖥️ **SSR-safe**                  | Import it anywhere in SvelteKit. No `browser` guards, no `onMount` dynamic imports.                                       |
+| 🧩 **Component _or_ attachment** | Two equal entry points. Use `<UPlot />`, or attach a chart to any `<div>` you already own.                                |
+| 🔌 **Plugins just work**         | Any uPlot plugin, yours or third-party, composes through `options.plugins`. The wrapper doesn't know they exist.          |
+| 🧪 **38 tests**                  | Real browser tests (Chromium) for lifecycle, resize and sync, plus Node tests pinning SSR safety.                         |
+
+**Non-goals, on purpose:** no per-option props, no bundled plugins, no styling
+layer, no chart-type helpers. Read [Scope](#scope) before opening a feature
+request — a "no" there is a design decision, not a backlog item.
 
 ## Install
 
@@ -24,6 +54,48 @@ Import uPlot's stylesheet once (e.g. in your root layout):
 
 ```js
 import 'uplot/dist/uPlot.min.css';
+```
+
+Peer dependencies: `svelte >= 5.29` (attachments) and `uplot >= 1.6.25`
+(`destroy()` leaves the sync bus on its own from that version). Nothing else.
+
+## Quick start
+
+```svelte
+<script lang="ts">
+	import { UPlot } from 'svelte-uplot';
+	import type { AlignedData, Options } from 'uplot';
+
+	const options: Options = {
+		width: 800,
+		height: 300,
+		series: [{}, { label: 'CPU', stroke: '#ff3e00', width: 2 }]
+	};
+
+	let data: AlignedData = $state([
+		[1, 2, 3, 4, 5],
+		[42, 51, 47, 63, 58]
+	]);
+</script>
+
+<UPlot style="height: 300px" {options} {data} />
+```
+
+That's the whole thing. Push a new `data` array and the chart updates in place;
+push a new `options` object and it reconfigures. Everything else is uPlot.
+
+A dashboard of charts sharing one crosshair:
+
+```svelte
+<UPlot style="height: 220px" options={cpuOptions} data={cpu} syncKey="host-1" />
+<UPlot style="height: 220px" options={memOptions} data={mem} syncKey="host-1" />
+<UPlot style="height: 220px" options={netOptions} data={net} syncKey="host-1" />
+```
+
+Streaming data without losing the user's zoom:
+
+```svelte
+<UPlot {options} data={live} resetScales={false} />
 ```
 
 ## Component
@@ -60,6 +132,15 @@ to update in place. Mutating a kept `options` reference is not observed. This
 also covers theming: derive `options` from your theme and a theme switch
 recreates the chart with new colors.
 
+```svelte
+<script lang="ts">
+	// a new object each time `theme` changes → chart recreated with new colors
+	const options = $derived({ ...base, axes: axesFor(theme.current) });
+</script>
+
+<UPlot {options} {data} />
+```
+
 `resetScales={false}` preserves the current zoom/pan across data updates.
 
 ### Props
@@ -72,6 +153,11 @@ recreates the chart with new colors.
 - `onCreate?/onDestroy?: (chart: uPlot) => void`
 - any other attributes go to the container `<div>` (which must have a height —
   the chart fills it)
+
+`onCreate` hands you the raw `uPlot` instance — the escape hatch for anything
+imperative (`u.setScale()`, `u.addSeries()`, custom event wiring). `onDestroy`
+is always called with the instance that callback was created alongside, so a
+recreate never mixes the outgoing chart up with incoming props.
 
 ### Autosize
 
@@ -130,12 +216,31 @@ The config object accepts the same fields as the component props
 (`options`, `data`, `resetScales`, `autosize`, `syncKey`, `onCreate`,
 `onDestroy`).
 
+Reach for the attachment when the `<div>` isn't yours to give up — inside another
+component's slot, on an element that already carries actions and bindings, or
+when you want the chart to live on a node you position yourself. It is the same
+code path the component uses, not a lesser one.
+
+## TypeScript
+
+Types ship with the package and come straight from uPlot: `options` is
+`uPlot.Options`, `data` is `uPlot.AlignedData`, callbacks get a real `uPlot`.
+There is no parallel type universe to learn, and no `any` in the way of
+autocomplete on uPlot's own config.
+
+```ts
+import type { UPlotConfig } from 'svelte-uplot';
+```
+
 ## SSR / SvelteKit
 
 uPlot is browser-only (canvas, ResizeObserver), but importing it is SSR-safe.
 The component server-renders to its bare container `<div>`; the chart is created
 strictly inside effects and attachments, which never run on the server. No
 `browser` checks or dynamic imports needed in your code.
+
+This is pinned down by tests that render the component in Node with no DOM at
+all — so it stays true.
 
 ## Scope
 
@@ -160,6 +265,10 @@ pnpm test:unit  # vitest browser mode (Chromium) + node SSR tests
 pnpm build      # svelte-package + publint
 ```
 
+Issues and PRs welcome — read [Scope](#scope) first, it answers most feature
+requests before they're written.
+
 ## License
 
-MIT
+MIT © [Vadim Yelisseyev](https://github.com/twister55)
+</content>
