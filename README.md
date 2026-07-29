@@ -7,6 +7,7 @@ from a cold start in ~90ms, in ~45 KB min.
 `svelte-uplot` is the ~3 KB layer that makes it feel like a Svelte component:
 declarative, reactive, autosizing, SSR-safe — with **zero** abstraction over uPlot's own API.
 
+[![CI](https://github.com/twister55/svelte-uplot/actions/workflows/ci.yml/badge.svg)](https://github.com/twister55/svelte-uplot/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/svelte-uplot?logo=npm&color=cb3837)](https://www.npmjs.com/package/svelte-uplot)
 [![gzip](https://img.shields.io/badge/runtime-3.1_kB_gzip-brightgreen)](#why-this-one)
 [![Svelte 5](https://img.shields.io/badge/Svelte-5%20runes-ff3e00?logo=svelte&logoColor=white)](https://svelte.dev)
